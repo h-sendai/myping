@@ -1,0 +1,17 @@
+64 bytes received
+00 00 8a 8a
+00 0a ed fe
+46 7a e2 5f
+00 00 00 00
+59 92 05 00
+00 00 00 00
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
+ff ff ff ff
