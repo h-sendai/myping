@@ -10,6 +10,8 @@ all: $(PROG)
 	@sudo setcap 'CAP_NET_RAW+eip' myping
 OBJS += $(PROG).o
 OBJS += in_cksum.o
+OBJS += set_timer.o
+OBJS += my_signal.o
 $(PROG): $(OBJS)
 
 clean:

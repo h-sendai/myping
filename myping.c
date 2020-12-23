@@ -19,6 +19,17 @@
 #include <netdb.h>
 
 #include "in_cksum.h"
+#include "set_timer.h"
+#include "my_signal.h"
+
+// struct icmp is defined in /usr/include/netinet/ip_icmp.h
+// data member
+// icmp_type
+// icmp_code
+// icmp_seq
+// icmp_seq
+// icmp_cksum
+// icmp_data
 
 int print_bytes(unsigned char *buf, int len)
 {
@@ -43,10 +54,18 @@ int usage()
     return 0;
 }
 
-int use_raw_sock = 1;
+int debug         = 0;
+int use_raw_sock  = 1;
 int use_ping_sock = 0;
-int debug = 0;
 
+// global variables used in sig_alrm signal handler
+int seq_num       = 0;
+int datalen       = 56;
+pid_t pid         = 0;
+unsigned char sendbuf[8000];
+int sockfd;
+struct sockaddr_in sa_send;
+ 
 int set_sockaddr_in(struct sockaddr_in *sa, char *remote_host)
 {
     struct sockaddr_in *resaddr;
@@ -72,6 +91,38 @@ int set_sockaddr_in(struct sockaddr_in *sa, char *remote_host)
     freeaddrinfo(res);
     
     return 0;
+}
+
+void sig_alrm(int signo)
+{
+    if (debug) {
+        fprintf(stderr, "sig_alrm()\n");
+    }
+
+    seq_num ++;
+    struct icmp *icmp = (struct icmp *)sendbuf;
+    icmp->icmp_type = ICMP_ECHO;
+    icmp->icmp_code = 0;
+    icmp->icmp_seq  = htons(seq_num);
+    icmp->icmp_id   = htons(pid);
+    memset(icmp->icmp_data, 0xFF, datalen);
+    gettimeofday((struct timeval *)&(icmp->icmp_data), NULL);
+
+    int len = 8 + datalen; /* 8: icmp header size */
+    icmp->icmp_cksum = 0;
+    icmp->icmp_cksum = in_cksum((unsigned short *)icmp, len);
+    if (debug) {
+        fprintf(stderr, "---> sendbuf\n");
+        print_bytes(sendbuf, len);
+    }
+
+    size_t n;
+    n = sendto(sockfd, sendbuf, len, 0, (struct sockaddr *)&sa_send, sizeof(sa_send));
+    if (n < 0) {
+        err(1, "sendto");
+    }
+    
+    return;
 }
 
 int main(int argc, char *argv[])
@@ -109,10 +160,8 @@ int main(int argc, char *argv[])
     }
     char *remote_host = argv[0];
 
-    struct sockaddr_in sa_send;
     set_sockaddr_in(&sa_send, remote_host);
 
-    int sockfd;
     if (use_raw_sock) {
         sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
     }
@@ -128,59 +177,34 @@ int main(int argc, char *argv[])
         err(1, "socket");
     }
 
-    unsigned char sendbuf[8000];
+    pid = getpid(); // will be used in sig_alrm
+
     unsigned char recvbuf[8000];
     memset(sendbuf, 0, sizeof(sendbuf));
     memset(recvbuf, 0, sizeof(recvbuf));
-    int datalen = 56;
-    // struct icmp is defined in /usr/include/netinet/ip_icmp.h
-    // data member
-    // icmp_type
-    // icmp_code
-    // icmp_seq
-    // icmp_seq
-    // icmp_cksum
-    // icmp_data
 
-    useconds_t interval_usec = strtod(interval_string, NULL)*1000000.0;
+    //useconds_t interval_usec = strtod(interval_string, NULL)*1000000.0;
+    struct timeval interval_tv = str2timeval(interval_string);
+    my_signal(SIGALRM, sig_alrm);
+    set_timer(interval_tv.tv_sec, interval_tv.tv_usec, interval_tv.tv_sec, interval_tv.tv_usec);
 
-    int seq_num = 0;
-    pid_t pid = getpid();
     for ( ; ; ) {
-        seq_num ++;
-        struct icmp *icmp = (struct icmp *)sendbuf;
-        icmp->icmp_type = ICMP_ECHO;
-        icmp->icmp_code = 0;
-        icmp->icmp_seq  = htons(seq_num);
-        icmp->icmp_id   = htons(pid);
-        memset(icmp->icmp_data, 0xFF, datalen);
-        gettimeofday((struct timeval *)&(icmp->icmp_data), NULL);
-
-        int len = 8 + datalen; /* 8: icmp header size */
-        icmp->icmp_cksum = 0;
-        icmp->icmp_cksum = in_cksum((unsigned short *)icmp, len);
-        if (debug) {
-            fprintf(stderr, "---> sendbuf\n");
-            print_bytes(sendbuf, len);
-        }
-
-        size_t n;
-        n = sendto(sockfd, sendbuf, len, 0, (struct sockaddr *)&sa_send, sizeof(sa_send));
-        if (n < 0) {
-            err(1, "sendto");
-        }
-        
         struct sockaddr_in sa_recv;
         memset(&sa_recv, 0, sizeof(sa_recv));
         socklen_t salen = sizeof(struct sockaddr_in);
 
-        n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&sa_recv, &salen);
+        int n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&sa_recv, &salen);
         if (n < 0) {
-            err(1, "recvfrom");
+            if (errno == EINTR) {
+                continue;
+            }
+            else {
+                err(1, "recvfrom");
+            }
         }
         if (debug) {
             fprintf(stderr, "---> recvbuf\n");
-            fprintf(stderr, "%ld bytes received\n", n);
+            fprintf(stderr, "%d bytes received\n", n);
             print_bytes(recvbuf, n);
         }
 
@@ -192,10 +216,12 @@ int main(int argc, char *argv[])
             type_pos += 20;
         }
 
-        //unsigned char *type_p = &recvbuf[type_pos];
-        //if (*type_p != ICMP_ECHOREPLY) {
-            //continue;
-        //}
+        // If we use SOCK_RAW socket, we will read not only ECHO_REPLY but also ECHO_REQUEST packet
+        // when ping to localhost
+        unsigned char *type_p = &recvbuf[type_pos];
+        if (*type_p != ICMP_ECHOREPLY) {
+            continue;
+        }
 
         tv0_p = (struct timeval *)&recvbuf[tv_in_recvbuf];
         tv0 = *tv0_p;
@@ -215,7 +241,6 @@ int main(int argc, char *argv[])
         if (debug) {
             fprintf(stderr, "sleep\n");
         }
-        usleep(interval_usec);
     }
     return 0;
 }
