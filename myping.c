@@ -47,13 +47,19 @@ int use_raw_sock = 1;
 int use_ping_sock = 0;
 int debug = 0;
 
+
 int main(int argc, char *argv[])
 {
     int c;
-    while ( (c = getopt(argc, argv, "drp")) != -1) {
+    char *interval_string = "1";
+
+    while ( (c = getopt(argc, argv, "di:rp")) != -1) {
         switch (c) {
             case 'd':
                 debug = 1;
+                break;
+            case 'i':
+                interval_string = optarg;
                 break;
             case 'r':
                 use_raw_sock  = 1;
@@ -127,54 +133,63 @@ int main(int argc, char *argv[])
     // icmp_seq
     // icmp_cksum
     // icmp_data
-    struct icmp *icmp = (struct icmp *)sendbuf;
-    icmp->icmp_type = ICMP_ECHO;
-    icmp->icmp_code = 0;
-    icmp->icmp_seq  = 0xfeed;
-    icmp->icmp_id   = getpid();
-    memset(icmp->icmp_data, 0xFF, datalen);
-    gettimeofday((struct timeval *)icmp->icmp_data, NULL);
 
-    int len = 8 + datalen; /* 8: icmp header size */
-    icmp->icmp_cksum = 0;
-    icmp->icmp_cksum = in_cksum((unsigned short *)icmp, len);
+    useconds_t interval_usec = strtod(interval_string, NULL)*1000000.0;
 
-    size_t n;
-    n = sendto(sockfd, sendbuf, len, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-    if (n < 0) {
-        err(1, "sendto");
+    for ( ; ; ) {
+        struct icmp *icmp = (struct icmp *)sendbuf;
+        icmp->icmp_type = ICMP_ECHO;
+        icmp->icmp_code = 0;
+        icmp->icmp_seq  = 0xfeed;
+        icmp->icmp_id   = getpid();
+        memset(icmp->icmp_data, 0xFF, datalen);
+        gettimeofday((struct timeval *)icmp->icmp_data, NULL);
+
+        int len = 8 + datalen; /* 8: icmp header size */
+        icmp->icmp_cksum = 0;
+        icmp->icmp_cksum = in_cksum((unsigned short *)icmp, len);
+
+        size_t n;
+        n = sendto(sockfd, sendbuf, len, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+        if (n < 0) {
+            err(1, "sendto");
+        }
+        
+        struct sockaddr_in remote;
+        memset(&remote, 0, sizeof(remote));
+        socklen_t salen = sizeof(struct sockaddr_in);
+
+        n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &salen);
+        if (n < 0) {
+            err(1, "recvfrom");
+        }
+        if (debug) {
+            printf("%ld bytes received\n", n);
+            print_bytes(recvbuf, n);
+        }
+
+        struct timeval *tv0_p, tv0, tv1, rtt;
+        int tv_in_recvbuf = 8; /* 8: icmp header */
+        if (use_raw_sock) {
+            tv_in_recvbuf += 20; /* XXX: 20: IP header.  should be decode IP header length value */
+        }
+
+        tv0_p = (struct timeval *)&recvbuf[tv_in_recvbuf];
+        tv0 = *tv0_p;
+        gettimeofday(&tv1, NULL);
+        timersub(&tv1, &tv0, &rtt);
+        if (debug) {
+            fprintf(stderr, "tv0: %ld.%06ld\n", tv0.tv_sec, tv0.tv_usec);
+            fprintf(stderr, "tv1: %ld.%06ld\n", tv1.tv_sec, tv1.tv_usec);
+            fprintf(stderr, "rtt: %ld.%06ld\n", rtt.tv_sec, rtt.tv_usec);
+        }
+
+        printf("RTT: %ld usec %ld.%06ld %ld.%06ld\n",
+            rtt.tv_sec*1000000 + rtt.tv_usec,
+            tv0.tv_sec, tv0.tv_usec,
+            tv1.tv_sec, tv1.tv_usec);
+
+        usleep(interval_usec);
     }
-    
-    struct sockaddr_in remote;
-    memset(&remote, 0, sizeof(remote));
-    socklen_t salen = sizeof(struct sockaddr_in);
-
-    n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &salen);
-    if (n < 0) {
-        err(1, "recvfrom");
-    }
-    if (debug) {
-        printf("%ld bytes received\n", n);
-        print_bytes(recvbuf, n);
-    }
-
-    struct timeval *tv0_p, tv0, tv1, rtt;
-    int tv_in_recvbuf = 8; /* 8: icmp header */
-    if (use_raw_sock) {
-        tv_in_recvbuf += 20; /* XXX: 20: IP header.  should be decode IP header length value */
-    }
-
-    tv0_p = (struct timeval *)&recvbuf[tv_in_recvbuf];
-    tv0 = *tv0_p;
-    gettimeofday(&tv1, NULL);
-    timersub(&tv1, &tv0, &rtt);
-    if (debug) {
-        fprintf(stderr, "tv0: %ld.%06ld\n", tv0.tv_sec, tv0.tv_usec);
-        fprintf(stderr, "tv1: %ld.%06ld\n", tv1.tv_sec, tv1.tv_usec);
-        fprintf(stderr, "rtt: %ld.%06ld\n", rtt.tv_sec, rtt.tv_usec);
-    }
-
-    printf("RTT: %ld usec\n", rtt.tv_sec*1000000 + rtt.tv_usec);
-
     return 0;
 }
