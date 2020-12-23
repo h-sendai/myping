@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    struct sockaddr_in servaddr;
+    struct sockaddr_in sa_send;
     struct sockaddr_in *resaddr;
     struct addrinfo    hints;
     struct addrinfo    *res;
@@ -100,10 +100,10 @@ int main(int argc, char *argv[])
     }
 
     resaddr = (struct sockaddr_in *)res->ai_addr;
-    memset((char *)&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port   = htons(0);
-    servaddr.sin_addr   = resaddr->sin_addr;
+    memset((char *)&sa_send, 0, sizeof(sa_send));
+    sa_send.sin_family = AF_INET;
+    sa_send.sin_port   = htons(0);
+    sa_send.sin_addr   = resaddr->sin_addr;
     freeaddrinfo(res);
 
     int sockfd;
@@ -150,16 +150,16 @@ int main(int argc, char *argv[])
         icmp->icmp_cksum = in_cksum((unsigned short *)icmp, len);
 
         size_t n;
-        n = sendto(sockfd, sendbuf, len, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+        n = sendto(sockfd, sendbuf, len, 0, (struct sockaddr *)&sa_send, sizeof(sa_send));
         if (n < 0) {
             err(1, "sendto");
         }
         
-        struct sockaddr_in remote;
-        memset(&remote, 0, sizeof(remote));
+        struct sockaddr_in sa_recv;
+        memset(&sa_recv, 0, sizeof(sa_recv));
         socklen_t salen = sizeof(struct sockaddr_in);
 
-        n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &salen);
+        n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&sa_recv, &salen);
         if (n < 0) {
             err(1, "recvfrom");
         }
