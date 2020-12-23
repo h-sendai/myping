@@ -220,6 +220,9 @@ int main(int argc, char *argv[])
         // when ping to localhost
         unsigned char *type_p = &recvbuf[type_pos];
         if (*type_p != ICMP_ECHOREPLY) {
+            if (debug) {
+                fprintf(stderr, "read not ICMP_ECHOREPLY packet\n");
+            }
             continue;
         }
 
@@ -237,10 +240,6 @@ int main(int argc, char *argv[])
             rtt.tv_sec*1000000 + rtt.tv_usec,
             tv0.tv_sec, tv0.tv_usec,
             tv1.tv_sec, tv1.tv_usec);
-
-        if (debug) {
-            fprintf(stderr, "sleep\n");
-        }
     }
     return 0;
 }
