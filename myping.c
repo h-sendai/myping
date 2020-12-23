@@ -183,16 +183,14 @@ int main(int argc, char *argv[])
     memset(sendbuf, 0, sizeof(sendbuf));
     memset(recvbuf, 0, sizeof(recvbuf));
 
-    //useconds_t interval_usec = strtod(interval_string, NULL)*1000000.0;
     struct timeval interval_tv = str2timeval(interval_string);
     my_signal(SIGALRM, sig_alrm);
     set_timer(interval_tv.tv_sec, interval_tv.tv_usec, interval_tv.tv_sec, interval_tv.tv_usec);
 
+    struct sockaddr_in sa_recv;
+    memset(&sa_recv, 0, sizeof(sa_recv));
+    socklen_t salen = sizeof(struct sockaddr_in);
     for ( ; ; ) {
-        struct sockaddr_in sa_recv;
-        memset(&sa_recv, 0, sizeof(sa_recv));
-        socklen_t salen = sizeof(struct sockaddr_in);
-
         int n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&sa_recv, &salen);
         if (n < 0) {
             if (errno == EINTR) {
@@ -208,26 +206,25 @@ int main(int argc, char *argv[])
             print_bytes(recvbuf, n);
         }
 
-        struct timeval *tv0_p, tv0, tv1, rtt;
-        int tv_in_recvbuf = 8; /* 8: icmp header */
-        int type_pos = 0;
+        unsigned char *ptr = recvbuf;
         if (use_raw_sock) {
-            tv_in_recvbuf += 20; /* XXX: 20: IP header.  should be decode IP header length value */
-            type_pos += 20;
+            /*
+             * If we use SOCK_RAW, recvbuf contains IP header at the beginning of the buffer.
+             * Decode the IP header length using struct ip in /usr/include/netinet/ip.h
+             */
+            struct ip *ip = (struct ip *)recvbuf;
+            ptr += (ip->ip_hl)*4; // Unit of ip_hl is 4 octets
         }
+        struct icmp *icmp = (struct icmp *)ptr;
 
-        // If we use SOCK_RAW socket, we will read not only ECHO_REPLY but also ECHO_REQUEST packet
-        // when ping to localhost
-        unsigned char *type_p = &recvbuf[type_pos];
-        if (*type_p != ICMP_ECHOREPLY) {
+        if (icmp->icmp_type != ICMP_ECHOREPLY) {
             if (debug) {
                 fprintf(stderr, "read not ICMP_ECHOREPLY packet\n");
             }
             continue;
         }
-
-        tv0_p = (struct timeval *)&recvbuf[tv_in_recvbuf];
-        tv0 = *tv0_p;
+        struct timeval tv0, tv1, rtt;
+        tv0 = *((struct timeval *)icmp->icmp_data);
         gettimeofday(&tv1, NULL);
         timersub(&tv1, &tv0, &rtt);
         if (debug) {
@@ -236,7 +233,8 @@ int main(int argc, char *argv[])
             fprintf(stderr, "rtt: %ld.%06ld\n", rtt.tv_sec, rtt.tv_usec);
         }
 
-        printf("RTT: %ld usec %ld.%06ld %ld.%06ld\n",
+        printf("%d %ld usec %ld.%06ld %ld.%06ld\n",
+            ntohs(icmp->icmp_seq),
             rtt.tv_sec*1000000 + rtt.tv_usec,
             tv0.tv_sec, tv0.tv_usec,
             tv1.tv_sec, tv1.tv_usec);
