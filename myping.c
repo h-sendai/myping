@@ -128,10 +128,15 @@ void sig_alrm(int signo)
 int main(int argc, char *argv[])
 {
     int c;
+    int count = -1;
+    int n_recv = 0;
     char *interval_string = "1";
 
-    while ( (c = getopt(argc, argv, "di:rp")) != -1) {
+    while ( (c = getopt(argc, argv, "c:di:rp")) != -1) {
         switch (c) {
+            case 'c':
+                count = strtol(optarg, NULL, 0);
+                break;
             case 'd':
                 debug = 1;
                 break;
@@ -242,6 +247,13 @@ int main(int argc, char *argv[])
             rtt.tv_sec*1000000 + rtt.tv_usec,
             ntohs(icmp->icmp_seq));
         fflush(stdout);
+        
+        n_recv += 1;
+        if (count != -1) {
+            if (n_recv == count) {
+                exit(0);
+            }
+        }
     }
     return 0;
 }
