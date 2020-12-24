@@ -1,0 +1,18 @@
+/usr/include/netinet/ip_icmp.h
+
+struct icmp {
+  uint8_t  icmp_type;   /* type of message, see below */
+  uint8_t  icmp_code;   /* type sub code */
+  uint16_t icmp_cksum;  /* ones complement checksum of struct */
+  uint16_t icmp_id;
+  unit16_t icmp_seq;
+  uint8_t  icmp_data;
+}
+
+icmp_id, icmp_seq, icmp_dataは他のicmp typeでも使えるように
+unionで定義され、さらにdefineでicmp_id等の名前で使えるように
+なっている。
+icmp_dataは構造体の最後で
+uint8_t id_data[1];
+と定義され、可変長構造体としてアクセスできるようになっている。
+
