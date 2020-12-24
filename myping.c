@@ -183,6 +183,9 @@ int main(int argc, char *argv[])
     memset(sendbuf, 0, sizeof(sendbuf));
     memset(recvbuf, 0, sizeof(recvbuf));
 
+    struct timeval start, elapsed;
+    gettimeofday(&start, NULL);
+
     struct timeval interval_tv = str2timeval(interval_string);
     my_signal(SIGALRM, sig_alrm);
     set_timer(interval_tv.tv_sec, interval_tv.tv_usec, interval_tv.tv_sec, interval_tv.tv_usec);
@@ -227,17 +230,17 @@ int main(int argc, char *argv[])
         tv0 = *((struct timeval *)icmp->icmp_data);
         gettimeofday(&tv1, NULL);
         timersub(&tv1, &tv0, &rtt);
+        timersub(&tv0, &start, &elapsed);
         if (debug) {
             fprintf(stderr, "tv0: %ld.%06ld\n", tv0.tv_sec, tv0.tv_usec);
             fprintf(stderr, "tv1: %ld.%06ld\n", tv1.tv_sec, tv1.tv_usec);
             fprintf(stderr, "rtt: %ld.%06ld\n", rtt.tv_sec, rtt.tv_usec);
         }
 
-        printf("%d %ld usec %ld.%06ld %ld.%06ld\n",
-            ntohs(icmp->icmp_seq),
+        printf("%ld.%06ld %ld usec %d\n",
+            elapsed.tv_sec, elapsed.tv_usec,
             rtt.tv_sec*1000000 + rtt.tv_usec,
-            tv0.tv_sec, tv0.tv_usec,
-            tv1.tv_sec, tv1.tv_usec);
+            ntohs(icmp->icmp_seq));
         fflush(stdout);
     }
     return 0;
