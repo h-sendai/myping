@@ -238,6 +238,7 @@ int main(int argc, char *argv[])
             rtt.tv_sec*1000000 + rtt.tv_usec,
             tv0.tv_sec, tv0.tv_usec,
             tv1.tv_sec, tv1.tv_usec);
+        fflush(stdout);
     }
     return 0;
 }
