@@ -198,6 +198,10 @@ int main(int argc, char *argv[])
     struct sockaddr_in sa_recv;
     memset(&sa_recv, 0, sizeof(sa_recv));
     socklen_t salen = sizeof(struct sockaddr_in);
+
+    // send first packet
+    sig_alrm(SIGALRM);
+
     for ( ; ; ) {
         int n = recvfrom(sockfd, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&sa_recv, &salen);
         if (n < 0) {
