@@ -48,7 +48,12 @@ int print_bytes(unsigned char *buf, int len)
 
 int usage()
 {
-    char msg[] = "Usage: myping remote_host";
+    char msg[] = "Usage: myping [-c count] [-i interval] [-r] [-p] remote_host"
+                 "       -c count\n"
+                 "       -i interval (allow decimal number)\n"
+                 "       -r: use raw socket  (socket(AF_INET, SOCK_RAW,   IPPROTO_ICMP)\n"
+                 "       -p: use ping socket (socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)\n"
+                 "";
     fprintf(stderr, "%s\n", msg);
 
     return 0;
@@ -132,7 +137,7 @@ int main(int argc, char *argv[])
     int n_recv = 0;
     char *interval_string = "1";
 
-    while ( (c = getopt(argc, argv, "c:di:rp")) != -1) {
+    while ( (c = getopt(argc, argv, "c:dhi:rp")) != -1) {
         switch (c) {
             case 'c':
                 count = strtol(optarg, NULL, 0);
@@ -140,6 +145,9 @@ int main(int argc, char *argv[])
             case 'd':
                 debug = 1;
                 break;
+            case 'h':
+                usage();
+                exit(0);
             case 'i':
                 interval_string = optarg;
                 break;
