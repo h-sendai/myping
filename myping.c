@@ -48,7 +48,7 @@ int print_bytes(unsigned char *buf, int len)
 
 int usage()
 {
-    char msg[] = "Usage: myping [-c count] [-i interval] [-r] [-p] remote_host"
+    char msg[] = "Usage: myping [-c count] [-i interval] [-r] [-p] remote_host\n"
                  "       -c count\n"
                  "       -i interval (allow decimal number)\n"
                  "       -r: use raw socket  (socket(AF_INET, SOCK_RAW,   IPPROTO_ICMP)\n"

@@ -2,7 +2,7 @@
 
 ## Usage
 ```
-Usage: myping [-c count] [-i interval] [-r] [-p] remote_host       -c count
+Usage: myping [-c count] [-i interval] [-r] [-p] remote_host
        -i interval (allow decimal number)
        -r: use raw socket  (socket(AF_INET, SOCK_RAW,   IPPROTO_ICMP)
        -p: use ping socket (socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP)
