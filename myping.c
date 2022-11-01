@@ -191,6 +191,9 @@ int main(int argc, char *argv[])
     }
 
     pid = getpid(); // will be used in sig_alrm
+    if (debug) {
+        fprintf(stderr, "pid: %d\n", pid);
+    }
 
     unsigned char recvbuf[8000];
     memset(sendbuf, 0, sizeof(sendbuf));
