@@ -237,12 +237,23 @@ int main(int argc, char *argv[])
         }
         struct icmp *icmp = (struct icmp *)ptr;
 
+        /* verify icmp_type to get ICMP_ECHOREPLY only */
         if (icmp->icmp_type != ICMP_ECHOREPLY) {
             if (debug) {
                 fprintf(stderr, "read not ICMP_ECHOREPLY packet\n");
             }
             continue;
         }
+        /* verify icmp_id to get ICMP_ECHOREPLY to the process only.
+           If we don't have this icmp_id verification, two or more
+           ping processes will not co-exist */
+        if (ntohs(icmp->icmp_id) != pid) {
+            if (debug) {
+                fprintf(stderr, "read ICMP_ECHOREPLY packet not to me\n");
+            }
+            continue;
+        }
+
         struct timeval tv0, tv1, rtt;
         tv0 = *((struct timeval *)icmp->icmp_data);
         gettimeofday(&tv1, NULL);
