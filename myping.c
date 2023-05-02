@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
            ping processes will not co-exist */
         if (ntohs(icmp->icmp_id) != pid) {
             if (debug) {
-                fprintf(stderr, "read ICMP_ECHOREPLY packet not to me\n");
+                fprintf(stderr, "read ICMP_ECHOREPLY packet not to me: my pid: %d, recv: %d\n", pid, ntohs(icmp->icmp_id));
             }
             continue;
         }
