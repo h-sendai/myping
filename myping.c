@@ -250,11 +250,15 @@ int main(int argc, char *argv[])
         /* verify icmp_id to get ICMP_ECHOREPLY to the process only.
            If we don't have this icmp_id verification, two or more
            ping processes will not co-exist */
-        if (ntohs(icmp->icmp_id) != pid) {
-            if (debug) {
-                fprintf(stderr, "read ICMP_ECHOREPLY packet not to me: my pid: %d, recv: %d\n", pid, ntohs(icmp->icmp_id));
+        /* If we use ping socket, icmp_id will be overwrite
+           in the kernel layer */
+        if (use_raw_sock) {
+            if (ntohs(icmp->icmp_id) != pid) {
+                if (debug) {
+                    fprintf(stderr, "read ICMP_ECHOREPLY packet not to me: my pid: %d, recv: %d\n", pid, ntohs(icmp->icmp_id));
+                }
+                continue;
             }
-            continue;
         }
 
         struct timeval tv0, tv1, rtt;
