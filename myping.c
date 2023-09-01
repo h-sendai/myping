@@ -191,6 +191,10 @@ int main(int argc, char *argv[])
     }
 
     pid = getpid(); // will be used in sig_alrm
+    // getpid() returns pid_t (4 bytes integer),
+    // but the struct icmp icmp_id is 2 bytes.
+    // so we have to round pid to 2 bytes
+    pid = (pid & 0x0000ffff);
     if (debug) {
         fprintf(stderr, "pid: %d\n", pid);
     }
